@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduGenie</title>
+
+    <link rel="stylesheet" href="/static/css/style.css">">
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🎓 EduGenie</h1>
+    <p>AI-Powered Learning Assistant</p>
+
+    <label for="task">Choose a task:</label>
+
+    <select id="task">
+        <option value="qa">Question & Answer</option>
+        <option value="explain">Explain Concept</option>
+        <option value="quiz">Generate Quiz</option>
+        <option value="summarize">Summarize</option>
+        <option value="learn">Learning Path</option>
+    </select>
+
+    <label for="inputText">
+        Enter your topic or question:
+    </label>
+
+    <textarea
+        id="inputText"
+        rows="6"
+        placeholder="Enter your question or topic here..."
+    ></textarea>
+
+    <button onclick="submitTask()">
+        Submit
+    </button>
+
+    <div id="loading"></div>
+
+    <div id="result"></div>
+
+</div>
+
+
+<script>
+
+async function submitTask() {
+
+    const task = document.getElementById("task").value;
+    const text = document.getElementById("inputText").value.trim();
+
+    const result = document.getElementById("result");
+    const loading = document.getElementById("loading");
+
+    if (!text) {
+        result.innerHTML = "⚠️ Please enter a question or topic.";
+        return;
+    }
+
+    loading.innerHTML = "⏳ Generating answer...";
+    result.innerHTML = "";
+
+    let endpoint;
+    let body;
+
+    // Question & Answer
+    if (task === "qa") {
+
+        endpoint = "/qa";
+
+        body = {
+            text: text
+        };
+
+    }
+
+    // Explain Concept
+    else if (task === "explain") {
+
+        endpoint = "/explain";
+
+        body = {
+            topic: text
+        };
+
+    }
+
+    // Generate Quiz
+    else if (task === "quiz") {
+
+        endpoint = "/quiz";
+
+        body = {
+            text: text
+        };
+
+    }
+
+    // Summarize
+    else if (task === "summarize") {
+
+        endpoint = "/summarize";
+
+        body = {
+            text: text
+        };
+
+    }
+
+    // Learning Path
+    else if (task === "learn") {
+
+        endpoint = "/learn/recommendations";
+
+        body = {
+            topic: text
+        };
+
+    }
+
+
+    try {
+
+        const response = await fetch(endpoint, {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify(body)
+
+        });
+
+
+        const contentType =
+            response.headers.get("content-type") || "";
+
+        let data;
+
+
+        if (contentType.includes("application/json")) {
+
+            data = await response.json();
+
+        } else {
+
+            const textResponse = await response.text();
+
+            throw new Error(textResponse);
+
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail || "Something went wrong."
+            );
+
+        }
+
+
+        loading.innerHTML = "";
+
+
+        // Display result according to task
+
+        if (task === "qa") {
+
+            result.innerHTML =
+                "<h2>Answer</h2>" +
+                formatText(data.answer);
+
+        }
+
+        else if (task === "explain") {
+
+            result.innerHTML =
+                "<h2>Explanation</h2>" +
+                formatText(data.explanation);
+
+        }
+
+        else if (task === "quiz") {
+
+            result.innerHTML =
+                "<h2>Quiz</h2>" +
+                formatQuiz(data.quiz);
+
+        }
+
+        else if (task === "summarize") {
+
+            result.innerHTML =
+                "<h2>Summary</h2>" +
+                formatText(data.summary);
+
+        }
+
+        else if (task === "learn") {
+
+            result.innerHTML =
+                "<h2>Learning Path</h2>" +
+                formatText(data.recommendations);
+
+        }
+
+    }
+
+    catch (error) {
+
+        loading.innerHTML = "";
+
+        result.innerHTML =
+            "<p class='error'>❌ Error: " +
+            escapeHtml(error.message) +
+            "</p>";
+
+    }
+
+}
+
+
+// Format normal AI text
+
+function formatText(text) {
+
+    if (!text) {
+        return "<p>No result received.</p>";
+    }
+
+    return "<div class='answer'>" +
+        escapeHtml(text)
+        .replace(/\n/g, "<br>") +
+        "</div>";
+}
+
+
+// Format quiz
+
+function formatQuiz(quiz) {
+
+    if (!quiz) {
+        return "<p>No quiz received.</p>";
+    }
+
+    if (quiz.error) {
+
+        return `
+            <p class="error">
+                ❌ ${escapeHtml(quiz.error)}
+            </p>
+            <pre>${escapeHtml(quiz.raw_response || "")}</pre>
+        `;
+
+    }
+
+    if (!Array.isArray(quiz)) {
+
+        return `
+            <pre>
+${escapeHtml(JSON.stringify(quiz, null, 2))}
+            </pre>
+        `;
+
+    }
+
+
+    let html = "";
+
+    quiz.forEach((item, index) => {
+
+        html += `
+            <div class="quiz-question">
+
+                <h3>
+                    ${index + 1}. 
+                    ${escapeHtml(item.question || "")}
+                </h3>
+
+                <ol type="A">
+        `;
+
+
+        if (Array.isArray(item.options)) {
+
+            item.options.forEach(option => {
+
+                html += `
+                    <li>
+                        ${escapeHtml(option)}
+                    </li>
+                `;
+
+            });
+
+        }
+
+
+        html += `
+                </ol>
+
+                <p>
+                    <strong>Answer:</strong>
+                    ${escapeHtml(item.answer || "")}
+                </p>
+
+            </div>
+        `;
+
+    });
+
+
+    return html;
+
+}
+
+
+// Prevent HTML injection
+
+function escapeHtml(value) {
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+}
+
+</script>
+
+</body>
+</html>
